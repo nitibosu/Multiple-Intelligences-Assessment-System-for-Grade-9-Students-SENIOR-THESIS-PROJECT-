@@ -1,0 +1,381 @@
+// ==========================================
+// 1. ระบบจัดการเส้นทางการเข้าถึง (Routing)
+// ==========================================
+function doGet(e) {
+  if (e.parameter && e.parameter.page == 'admin') {
+    return HtmlService.createTemplateFromFile('Administrator').evaluate().setTitle('ระบบจัดการหลังบ้าน - แบบประเมินความถนัดทางพหุปัญญา').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  } else {
+    return HtmlService.createTemplateFromFile('Index').evaluate().setTitle('ระบบแบบประเมินความถนัดทางพหุปัญญา สำหรับนักเรียนชั้นมัธยมศึกษาปีที่ 3').addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+}
+
+function include(filename) { return HtmlService.createHtmlOutputFromFile(filename).getContent(); }
+
+// ==========================================
+// 2. ระบบการตั้งค่าและการตรวจสอบสิทธิ์
+// ==========================================
+function getSystemConfig() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("AdminConfig");
+  if (!sheet) {
+    sheet = ss.insertSheet("AdminConfig");
+    sheet.appendRow(["Admin Name", "Admin Email", "Password", "Gemini API Key", "AI Prompt"]);
+    sheet.appendRow(["แอดมิน", "admin@school.ac.th", "admin1234", "", ""]); 
+    sheet.getRange("A1:E1").setFontWeight("bold").setBackground("#d9ead3");
+  }
+  return {
+    name: sheet.getRange("A2").getValue().toString().trim(),
+    email: sheet.getRange("B2").getValue().toString().trim(),
+    password: sheet.getRange("C2").getValue().toString().trim(),
+    apiKey: sheet.getRange("D2").getValue().toString().trim(),
+    prompt: sheet.getRange("E2").getValue().toString().trim()
+  };
+}
+
+function getAdminCredentials() { return getSystemConfig(); }
+
+function verifyAdminPassword(password) {
+  try {
+    var config = getSystemConfig(); 
+    if (password === config.password) { return { status: "success", url: ScriptApp.getService().getUrl() }; } 
+    else { return { status: "error", message: "รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง" }; }
+  } catch (e) { return { status: "error", message: "เกิดข้อผิดพลาด: " + e.toString() }; }
+}
+
+function getSystemSettings() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("AdminConfig");
+    if (!sheet) throw new Error("ไม่พบแผ่นงาน AdminConfig ในระบบ");
+    if (sheet.getRange("E1").getValue() === "") { sheet.getRange("E1").setValue("AI Prompt").setFontWeight("bold").setBackground("#d9ead3"); }
+    return { apiKey: sheet.getRange("D2").getValue().toString().trim(), prompt: sheet.getRange("E2").getValue().toString().trim() };
+  } catch (e) { return { error: e.message }; }
+}
+
+function saveSystemSettings(apiKey, promptText) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName("AdminConfig");
+    if (!sheet) throw new Error("ไม่พบแผ่นงาน AdminConfig ในระบบ");
+    sheet.getRange("D2").setValue(apiKey);
+    sheet.getRange("E2").setValue(promptText);
+    return "อัปเดตข้อมูล API Key และ AI Prompt เรียบร้อยแล้ว";
+  } catch (e) { throw new Error("การบันทึกล้มเหลว: " + e.message); }
+}
+
+// ==========================================
+// 3. ระบบข้อมูลแดชบอร์ดหลังบ้าน
+// ==========================================
+function getDashboardStats() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Results");
+    if (!sheet) return { status: "success", totalUsers: 0, dominantCounts: {}, recentSubmissions: [] };
+    var data = sheet.getDataRange().getDisplayValues();
+    if (data.length <= 1) return { status: "success", totalUsers: 0, dominantCounts: {}, recentSubmissions: [] };
+
+    var totalUsers = 0;
+    var dominantCounts = {};
+    var recentSubmissions = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var domValue = row[11] ? row[11].toString().trim() : "";
+      if (!domValue || domValue.startsWith("{")) continue;
+
+      totalUsers++;
+      dominantCounts[domValue] = (dominantCounts[domValue] || 0) + 1;
+      if (i >= data.length - 10) recentSubmissions.push({ date: row[0], name: row[1], email: row[2], dominant: domValue });
+    }
+    return { status: "success", totalUsers: totalUsers, dominantCounts: dominantCounts, recentSubmissions: recentSubmissions.reverse() };
+  } catch(e) { return { status: "error", message: e.message }; }
+}
+
+function getAdministratorDashboardData() {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var data = { status: "success", totalUsers: 0, totalQuestions: 0, usersList: [], questionsList: [] };
+
+    var sheetResults = ss.getSheetByName("Results");
+    if (sheetResults) {
+      var rValues = sheetResults.getDataRange().getDisplayValues();
+      if (rValues.length > 1) { data.usersList = rValues.slice(1).reverse(); data.totalUsers = data.usersList.length; }
+    }
+
+    var sheetQuestions = ss.getSheetByName("Questions");
+    if (sheetQuestions) {
+      var qValues = sheetQuestions.getDataRange().getDisplayValues();
+      if (qValues.length > 1) { data.questionsList = qValues.slice(1); data.totalQuestions = data.questionsList.length; }
+    }
+    return data;
+  } catch (e) { return { status: "error", message: e.message }; }
+}
+
+// ==========================================
+// 4. ระบบจัดการคำถามและการลบข้อมูลผู้ใช้งาน
+// ==========================================
+function getQuestionsFromDatabase() {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Questions");
+    if (!sheet) throw new Error("ไม่พบแผ่นงาน Questions");
+    var data = sheet.getDataRange().getDisplayValues();
+    var questionsArray = [];
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][1]) { questionsArray.push({ id: data[i][0].toString().trim(), text: data[i][1].toString().trim(), category: data[i][2] ? data[i][2].toString().trim() : "" }); }
+    }
+    return questionsArray;
+  } catch (e) { return { error: e.message }; }
+}
+
+function addQuestionToSystem(questionText, categoryTarget) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Questions');
+  sheet.appendRow(['q' + new Date().getTime(), questionText, categoryTarget]);
+  return "เพิ่มข้อคำถามเข้าสู่ระบบเรียบร้อยแล้ว";
+}
+
+function editQuestionInSystem(id, newText, newCategory) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Questions');
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0].toString() === id.toString()) {
+        sheet.getRange(i + 1, 2).setValue(newText);
+        sheet.getRange(i + 1, 3).setValue(newCategory);
+        return "อัปเดตข้อมูลข้อคำถามสำเร็จ";
+      }
+    }
+    throw new Error("ไม่พบรหัสข้อคำถามในระบบ");
+  } catch (e) { throw new Error("การแก้ไขล้มเหลว: " + e.message); }
+}
+
+function deleteQuestionFromSystem(questionId) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Questions');
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] == questionId) { sheet.deleteRow(i + 1); return "ลบข้อคำถามออกจากระบบเรียบร้อยแล้ว"; }
+  }
+  throw new Error("ไม่พบรหัสข้อคำถามที่ต้องการลบ");
+}
+
+function deleteUserData(userId) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Results');
+    var data = sheet.getDataRange().getDisplayValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0].toString() === userId.toString()) { sheet.deleteRow(i + 1); return "ลบข้อมูลเรียบร้อยแล้ว"; }
+    }
+    return "ไม่พบข้อมูลที่ต้องการลบ";
+  } catch(e) { return "เกิดข้อผิดพลาด: " + e.message; }
+}
+
+// ==========================================
+// 5. ระบบคำนวณและประมวลผล AI 
+// ==========================================
+
+// ✅ อัปเดต: กรองเฉพาะค่า 4 และ 5 ตามคำแนะนำของอาจารย์
+// หากผู้ใช้ตอบ 1, 2, หรือ 3 จะส่งค่ากลับเป็น 0 เพื่อไม่ให้นำไปคิดคะแนนรวม
+function getQValue(data, index) {
+  var val = 0;
+  if (data.answersArray && data.answersArray.length >= index) {
+    val = Number(data.answersArray[index - 1]) || 0;
+  } else {
+    val = Number(data['q' + index]) || Number(data['Q' + index]) || Number(data[index]) || 0;
+  }
+  // นำค่า 1-3 ออก คิดเฉพาะค่า 4 และ 5
+  return (val === 4 || val === 5) ? val : 0;
+}
+
+function processAssessment(data) {
+  try {
+    var config = getSystemConfig(); 
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheetResults = ss.getSheetByName("Results");
+    if (!sheetResults) {
+      sheetResults = ss.insertSheet("Results");
+      sheetResults.appendRow(["Timestamp", "Name", "Email", "Linguistic", "Logical", "Spatial", "Kinesthetic", "Musical", "Interpersonal", "Intrapersonal", "Naturalist", "Dominant_Intelligence", "AI_JSON_Data"]);
+    }
+
+    var scores = {
+      "ด้านภาษา": getQValue(data,1)+getQValue(data,2)+getQValue(data,3)+getQValue(data,4)+getQValue(data,5)+getQValue(data,6)+getQValue(data,7)+getQValue(data,8),
+      "ด้านตรรกะและคณิตศาสตร์": getQValue(data,9)+getQValue(data,10)+getQValue(data,11)+getQValue(data,12)+getQValue(data,13)+getQValue(data,14)+getQValue(data,15)+getQValue(data,16),
+      "ด้านมิติสัมพันธ์": getQValue(data,17)+getQValue(data,18)+getQValue(data,19)+getQValue(data,20)+getQValue(data,21)+getQValue(data,22)+getQValue(data,23)+getQValue(data,24),
+      "ด้านร่างกายและการเคลื่อนไหว": getQValue(data,25)+getQValue(data,26)+getQValue(data,27)+getQValue(data,28)+getQValue(data,29)+getQValue(data,30)+getQValue(data,31)+getQValue(data,32),
+      "ด้านดนตรี": getQValue(data,33)+getQValue(data,34)+getQValue(data,35)+getQValue(data,36)+getQValue(data,37)+getQValue(data,38)+getQValue(data,39)+getQValue(data,40),
+      "ด้านมนุษยสัมพันธ์": getQValue(data,41)+getQValue(data,42)+getQValue(data,43)+getQValue(data,44)+getQValue(data,45)+getQValue(data,46)+getQValue(data,47)+getQValue(data,48),
+      "ด้านเข้าใจตนเอง": getQValue(data,49)+getQValue(data,50)+getQValue(data,51)+getQValue(data,52)+getQValue(data,53)+getQValue(data,54)+getQValue(data,55)+getQValue(data,56),
+      "ด้านธรรมชาติวิทยา": getQValue(data,57)+getQValue(data,58)+getQValue(data,59)+getQValue(data,60)+getQValue(data,61)+getQValue(data,62)+getQValue(data,63)+getQValue(data,64)
+    };
+    
+    var sortedScores = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    var dominant = sortedScores[0][0];
+    var secondDom = sortedScores[1][0];
+    
+    var aiData = { summary: "-", academic: "-", vocational: "-", learningStyle: "-", career: "-", development: "-" };
+
+    if (!config.apiKey || !config.prompt) {
+      aiData.summary = "⚠️ ระบบ AI ยังไม่พร้อมใช้งาน: กรุณาระบุ API Key และ Prompt ในเมนูตั้งค่าระบบหลังบ้าน";
+    } else {
+      
+      var logisticPrediction = calculatePlanPercentages(data);
+      var aptitudeRanking = calculateAptitudePercentages(scores); 
+      var predictionText = logisticPrediction.map(function(item) { 
+        return item.plan + " " + Math.round(item.percentage) + "%"; 
+      }).join(", ");
+      
+      var finalPrompt = config.prompt
+        .replace("{{userName}}", data.userName)
+        .replace("{{scores}}", JSON.stringify(scores))
+        .replace("{{dominant}}", dominant)
+        .replace("{{secondDom}}", secondDom)
+        .replace("{{prediction}}", predictionText); 
+
+      var aiResponse = callGeminiAI(finalPrompt, config.apiKey);
+
+      if (aiResponse.startsWith("ERROR_API:")) {
+        aiData.summary = "⚠️ การเชื่อมต่อ AI ล้มเหลว กรุณาตรวจสอบ API Key: " + aiResponse.replace("ERROR_API:", "").substring(0, 80) + "...";
+      } else {
+        try {
+          var cleanJson = aiResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+          var startIndex = cleanJson.indexOf('{');
+          var endIndex = cleanJson.lastIndexOf('}');
+
+          if (startIndex !== -1 && endIndex !== -1) {
+            aiData = JSON.parse(cleanJson.substring(startIndex, endIndex + 1));
+          } else {
+            aiData.summary = "⚠️ ข้อมูลจาก AI ผิดรูปแบบ: ไม่สามารถแปลงผลลัพธ์เป็นแผนการเรียนได้";
+          }
+        } catch (e) {
+          aiData.summary = "⚠️ ข้อผิดพลาดในการจัดเรียงข้อมูล JSON: " + e.message;
+        }
+      }
+    }
+
+    sheetResults.appendRow([new Date(), data.userName, data.email, scores["ด้านภาษา"], scores["ด้านตรรกะและคณิตศาสตร์"], scores["ด้านมิติสัมพันธ์"], scores["ด้านร่างกายและการเคลื่อนไหว"], scores["ด้านดนตรี"], scores["ด้านมนุษยสัมพันธ์"], scores["ด้านเข้าใจตนเอง"], scores["ด้านธรรมชาติวิทยา"], dominant, JSON.stringify(aiData)]);
+
+    var sheetResponses = ss.getSheetByName("Responses");
+    if (!sheetResponses) {
+        sheetResponses = ss.insertSheet("Responses");
+        var headers = ["Timestamp", "Email"];
+        for(var i=1; i<=64; i++) headers.push("Q"+i);
+        sheetResponses.appendRow(headers);
+    }
+    if (data.answersArray) {
+      var respRow = [new Date(), data.email].concat(data.answersArray);
+      sheetResponses.appendRow(respRow);
+    }
+
+    return { status: "success", scores: scores, aiData: aiData, prediction: logisticPrediction, aptitudes: aptitudeRanking };
+  } catch (error) { return { status: "error", message: error.toString() }; }
+}
+
+function callGeminiAI(prompt, apiKey) {
+  try {
+    var url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + apiKey;
+    var payload = { 
+      "contents": [{ "parts": [{ "text": prompt }] }], 
+      "generationConfig": { "temperature": 0.2, "response_mime_type": "application/json" } 
+    };
+    var options = { "method": "post", "contentType": "application/json", "payload": JSON.stringify(payload), "muteHttpExceptions": true };
+    var res = UrlFetchApp.fetch(url, options);
+    
+    if (res.getResponseCode() !== 200) { return "ERROR_API: " + res.getContentText(); }
+    
+    var json = JSON.parse(res.getContentText());
+    if (json.candidates && json.candidates.length > 0) return json.candidates[0].content.parts[0].text;
+    return "ERROR_API: No valid data from Gemini";
+  } catch (e) { return "ERROR_API: " + e.toString(); }
+}
+
+// ==========================================
+// 6. อัลกอริทึมคำนวณความเหมาะสมแผนการเรียน (CFA Item-Level Weights)
+// ==========================================
+function calculatePlanPercentages(data) {
+  // ✅ อัปเดต: ดึงค่าดิบก่อน เพื่อนำมาแปลงเกณฑ์
+  const getRawQ = (qNum) => {
+    if (data.answersArray && data.answersArray.length >= qNum) {
+      return Number(data.answersArray[qNum - 1]) || 0;
+    }
+    return Number(data['q' + qNum]) || Number(data['Q' + qNum]) || Number(data[qNum]) || 0;
+  };
+
+  const calcCFA = (weightsObj) => {
+    let earnedScore = 0;
+    let maxPossibleScore = 0;
+    
+    for (const [qStr, weight] of Object.entries(weightsObj)) {
+      const qNum = parseInt(qStr.replace(/\D/g, ''));
+      const rawVal = getRawQ(qNum);
+      // ✅ กรองให้เหลือเฉพาะข้อที่ตอบ 4 หรือ 5
+      const qVal = (rawVal === 4 || rawVal === 5) ? rawVal : 0;
+      
+      const absWeight = Math.abs(weight);
+      
+      if (qVal > 0) { 
+        if (weight < 0) {
+          earnedScore += ((6 - qVal) * absWeight); // กลับด้านคะแนนสำหรับ Negative Weight
+        } else {
+          earnedScore += (qVal * absWeight);
+        }
+      } else {
+        // หากตอบ 1, 2, 3 จะถือว่าคะแนนที่ได้สำหรับน้ำหนักนี้คือ 0
+        earnedScore += 0; 
+      }
+      maxPossibleScore += (5 * absWeight); // คะแนนเต็มรายข้อคือ 5
+    }
+    return maxPossibleScore > 0 ? (earnedScore / maxPossibleScore) * 100 : 0;
+  };
+
+  let results = [];
+
+  // ==========================
+  // สายสามัญ 5 แผนการเรียน 
+  // ==========================
+  results.push({ plan: "วิทย์ - คณิต", percentage: calcCFA({ q3: 0.601, q4: 0.5375, q5: 0.5071, q6: 0.4522, q7: 0.5385, q8: 0.5969, q9: 0.6832, q11: 0.3381, q12: 0.3106, q13: 0.4433, q14: 0.5879, q15: 0.7428, q17: 0.5064, q18: 0.5591, q19: 0.5052, q20: 0.5146, q21: 0.3968, q22: 0.4811, q24: 0.5655, q33: 0.4397, q34: 0.7426, q36: 0.5519, q40: 0.7764, q42: 0.6244, q43: 0.4175, q45: 0.6351, q46: 0.5801, q47: 0.5532, q49: 0.6095, q51: 0.6094, q54: 0.5754, q56: 0.6672, q59: 0.6004, q60: 0.622, q61: 0.5691, q63: 0.5553, q64: 0.7479 }) });
+  results.push({ plan: "ศิลป์ - คำนวณ", percentage: calcCFA({ q9: 0.7927, q10: 0.8321, q11: 0.5651, q12: 0.3899, q13: 0.3698, q14: 0.42, q15: 0.8544, q16: 0.8167, q17: 0.6833, q21: 0.7704, q22: 0.5565, q23: 0.566, q24: 0.2694, q25: 0.6145, q30: 0.4903, q32: 0.4735, q33: 0.7463, q34: 0.7371, q35: 0.8792, q36: 0.771, q38: 0.6226, q39: 0.7295, q40: 0.8555, q42: 0.8234, q44: 0.6009, q46: 0.7078, q47: 0.8988, q48: 0.6669, q50: 0.7788, q51: 0.6514, q52: 0.5455, q53: 0.4092, q56: 0.7376, q59: 0.7513, q60: 0.8245, q61: 0.5933, q62: 0.423, q63: 0.8428, q64: 0.7338 }) });
+  results.push({ plan: "ศิลป์ - ภาษา", percentage: calcCFA({ q10: 0.5966, q12: 0.5488, q14: 0.5133, q15: 0.5477, q30: 0.2369, q33: 0.6227, q34: 0.6364, q35: 0.8227, q36: 0.7416, q38: 0.6185, q39: 0.7476, q40: 0.6465, q42: 0.665, q43: 0.5513, q45: 0.6826, q46: 0.7227, q47: 0.4766, q48: 0.5658, q54: 0.4065, q55: 0.3563, q57: 0.3882, q59: 0.6063, q60: 0.5859, q61: 0.6045, q63: 0.67, q64: 0.6622 }) });
+  results.push({ plan: "ศิลป์ - สังคม", percentage: calcCFA({ q2: 0.6361, q3: 0.6584, q4: 0.4494, q5: 0.915, q6: 0.7837, q8: 0.5082, q9: 0.847, q10: 0.6952, q11: 0.4939, q12: 0.6517, q13: 0.433, q14: 0.5423, q15: 0.7717, q16: 0.871, q25: 0.6529, q27: 0.7514, q28: 0.5758, q30: 0.5888, q31: 0.7798, q32: 0.6592, q34: 0.601, q35: 0.7603, q36: 0.7075, q37: 0.4675, q38: 0.5438, q39: 0.3482, q40: 0.6037, q41: 0.3895, q42: 0.7738, q44: 0.7824, q45: 0.6428, q46: 0.4352, q47: 0.6236, q48: 0.7407, q49: 0.791, q50: 0.713, q51: 0.6979, q52: 0.8153, q54: 0.5548, q56: 0.7567, q61: 0.5119 }) });
+  results.push({ plan: "ห้องเรียนพิเศษ (SMTE, EP)", percentage: calcCFA({ q5: 0.2885, q8: 0.8445, q9: 0.7829, q10: 0.4635, q11: 0.3765, q12: 0.5285, q13: 0.3343, q14: 0.5533, q15: 0.8159, q16: 0.7437, q17: 0.7284, q19: 0.6572, q22: 0.5725, q26: 0.3944, q28: 0.9861, q32: 0.3979, q33: 0.5087, q34: 0.6586, q35: 0.6262, q36: 0.6616, q38: 0.603, q39: 0.4397, q40: 0.8994, q42: 0.6699, q43: 0.6902, q44: 0.6433, q45: 0.7088, q46: 0.4423, q47: 0.5111, q48: 0.5979, q54: 0.3369, q57: 0.4966, q59: 0.6095, q61: 0.5928, q64: 0.4548 }) });
+
+  // ==========================
+  // สายอาชีพ 8 สาขางาน
+  // ==========================
+  results.push({ plan: "ปวช. สาขางานยานยนต์", percentage: calcCFA({ q7: 0.553, q2: -0.440, q6: 0.365, q10: 0.523, q12: -0.461, q16: 0.295, q15: 0.149, q13: 0.149, q11: -0.131, q22: -0.527, q20: -0.464, q19: -0.331, q21: -0.299, q23: 0.241, q28: 0.952, q25: 0.390, q32: 0.267, q27: 0.116, q31: -0.103, q29: -0.086, q36: 0.665, q38: -0.504, q37: 0.339 }) });
+  results.push({ plan: "ปวช. สาขางานโครงสร้าง", percentage: calcCFA({ q1: 0.345, q6: -0.318, q3: -0.443, q16: 0.690, q10: 0.281, q13: -0.211, q15: -0.168, q14: -0.122, q18: 0.903, q19: 0.308, q22: 0.041, q30: 0.245, q28: 0.220, q31: -0.022, q29: -0.675, q33: 0.218, q38: -0.427, q40: -0.585, q41: 0.349, q45: 0.201, q47: 0.038, q42: -0.163, q46: -0.547, q54: 0.222, q49: 0.215, q50: -0.170, q52: -0.360, q53: -0.381, q55: -0.477, q59: 0.639, q63: 0.207, q61: -0.052 }) });
+  results.push({ plan: "ปวช. สาขางานไฟฟ้ากำลัง", percentage: calcCFA({ q13: 0.451, q10: 0.436, q14: -0.094, q15: -0.219, q16: -0.301, q28: 0.131, q29: -0.681, q30: -0.424, q31: -0.019, q59: 0.504, q58: 0.251, q61: -0.243, q63: -0.084 }) });
+  results.push({ plan: "ปวช. สาขางานการบัญชี", percentage: calcCFA({ q9: 0.366, q10: -0.227, q13: 0.092, q17: 0.644, q21: 0.192, q19: 0.178, q25: 0.750, q27: -0.323, q26: 0.249, q31: -0.084, q34: 0.425, q35: 0.329, q37: 0.173, q33: 0.041, q43: 0.629, q44: -0.260, q42: -0.246, q45: 0.240, q41: 0.031, q50: 0.758, q53: -0.438, q49: 0.435, q52: -0.406, q54: 0.298, q56: 0.257, q58: 0.529, q59: 0.220, q64: -0.195 }) });
+  results.push({ plan: "ปวช. สาขางานอิเล็กทรอนิกส์", percentage: calcCFA({ q5: 0.862, q1: 0.184, q4: -0.099, q2: -0.239, q3: -0.344, q10: 0.522, q13: 0.017, q17: 0.513, q23: 0.361, q20: 0.031, q22: -0.071, q21: -0.225, q18: -0.361, q19: -0.491, q27: 0.582, q26: 0.131, q32: -0.279, q41: 0.635, q43: 0.351, q49: 0.595, q52: 0.159, q56: -0.022, q53: -0.317, q55: -0.509, q59: 0.554, q61: 0.154 }) });
+  results.push({ plan: "ปวช. สาขางานการตลาด", percentage: calcCFA({ q1: 0.149, q12: -0.460, q9: 0.398, q10: -0.299, q14: 0.101, q17: 0.818, q21: 0.168, q19: -0.153, q25: 0.905, q32: -0.202, q26: 0.109, q27: -0.067, q35: 0.484, q38: 0.417, q36: 0.411, q37: 0.325, q34: 0.283, q39: -0.166, q40: -0.011, q44: 0.607, q42: 0.281, q45: -0.202, q43: -0.187, q51: 0.576, q54: 0.375, q49: 0.309, q52: -0.179, q53: -0.078, q50: -0.041, q56: 0.032, q62: 0.488, q63: -0.389, q59: 0.084 }) });
+  results.push({ plan: "ปวช. สาขางานคอมพิวเตอร์ธุรกิจ", percentage: calcCFA({ q4: 0.571, q6: 0.487, q8: -0.415, q5: -0.296, q2: 0.268, q3: -0.190, q9: 0.754, q12: -0.403, q10: 0.349, q16: -0.203, q18: 0.602, q22: -0.504, q21: 0.071, q20: -0.051, q27: -0.519, q28: 0.456, q29: 0.361, q30: 0.302, q31: 0.290, q26: 0.130, q40: 0.529, q35: 0.523, q33: 0.282, q36: 0.227, q34: 0.166, q45: -0.741, q46: -0.153, q42: 0.071, q51: -0.759, q50: 0.223, q53: -0.188, q49: 0.167 }) });
+  results.push({ plan: "ปวช. สาขางานธุรกิจค้าปลีกใหม่", percentage: calcCFA({ q9: 0.734, q13: -0.293, q12: 0.225, q14: -0.184, q11: 0.180, q20: -0.590, q23: -0.480, q21: 0.331, q17: 0.163, q24: -0.037, q28: -0.841, q32: 0.164, q25: 0.142, q48: 0.550, q44: 0.313, q45: 0.058 }) });
+
+  results = results.map(r => {
+    let p = Math.min(Math.max(r.percentage, 0), 100);
+    return { plan: r.plan, percentage: Math.round(p) };
+  });
+
+  results.sort((a, b) => b.percentage - a.percentage);
+  return results;
+}
+
+// 🌟 ฟังก์ชันที่ 2: คำนวณเปอร์เซ็นต์ความถนัด 8 ด้าน สำหรับแสดงผลในกราฟ 
+function calculateAptitudePercentages(scores) {
+  const aptitudes = [
+    { name: "ด้านภาษา", score: scores["ด้านภาษา"], max: 40 }, 
+    { name: "ด้านตรรกะและคณิตศาสตร์", score: scores["ด้านตรรกะและคณิตศาสตร์"], max: 40 }, 
+    { name: "ด้านมิติสัมพันธ์", score: scores["ด้านมิติสัมพันธ์"], max: 40 }, 
+    { name: "ด้านร่างกายและการเคลื่อนไหว", score: scores["ด้านร่างกายและการเคลื่อนไหว"], max: 40 }, 
+    { name: "ด้านดนตรี", score: scores["ด้านดนตรี"], max: 40 }, 
+    { name: "ด้านมนุษยสัมพันธ์", score: scores["ด้านมนุษยสัมพันธ์"], max: 40 }, 
+    { name: "ด้านเข้าใจตนเอง", score: scores["ด้านเข้าใจตนเอง"], max: 40 }, 
+    { name: "ด้านธรรมชาติวิทยา", score: scores["ด้านธรรมชาติวิทยา"], max: 40 } 
+  ];
+
+  let results = aptitudes.map(apt => {
+    return {
+      name: apt.name,
+      percentage: Math.round(Math.min(100, Math.max(0, (apt.score / apt.max) * 100)))
+    };
+  });
+
+  results.sort((a, b) => b.percentage - a.percentage);
+  return results;
+}

@@ -1,0 +1,375 @@
+<script>
+  let editModal; 
+  let globalQuestions = []; 
+  let currentQPage = 1;     
+  const qRowsPerPage = 10;  
+
+  const SwalPremium = Swal.mixin({
+    customClass: {
+      popup: 'swal-popup-glass', title: 'swal-title-glass',
+      htmlContainer: 'swal-html-glass',
+      actions: 'swal2-actions', confirmButton: 'swal-btn-confirm',
+      cancelButton: 'swal-btn-cancel'
+    },
+    buttonsStyling: false
+  });
+
+  setTimeout(() => {
+    if(document.getElementById('modalEditQuestion')) {
+      editModal = new bootstrap.Modal(document.getElementById('modalEditQuestion'));
+    }
+    if(typeof google !== 'undefined') {
+      google.script.run
+        .withSuccessHandler(function(creds) {
+          if(creds && creds.name) {
+            document.getElementById('displayAdminName').innerText = creds.name;
+            document.getElementById('displayAdminEmail').innerText = creds.email;
+          }
+        })
+        .withFailureHandler(function(err) {
+          document.getElementById('displayAdminName').innerText = "ผู้ดูแลระบบ";
+          document.getElementById('displayAdminEmail').innerText = "ระบบจัดการหลังบ้าน";
+        })
+        .getAdminCredentials();
+
+      requestData(); 
+      loadSystemSettings();
+    }
+  }, 150);
+
+  function switchAdminTab(targetId, title, btnElement) {
+    document.getElementById('pageTitle').innerText = title;
+    document.querySelectorAll('.tab-pane').forEach(pane => {
+      pane.classList.remove('show', 'active');
+      pane.style.display = 'none'; 
+    });
+    let targetPane = document.getElementById(targetId);
+    if (targetPane) {
+      targetPane.style.display = 'block'; 
+      setTimeout(() => targetPane.classList.add('show', 'active'), 30);
+    }
+    document.querySelectorAll('#adminTabs .nav-link').forEach(btn => btn.classList.remove('active'));
+    if (btnElement) btnElement.classList.add('active');
+  }
+
+  function requestData() {
+    google.script.run
+      .withSuccessHandler(function(data) {
+        if (data.status === "error") return SwalPremium.fire({ icon: 'error', title: 'เกิดข้อผิดพลาด', text: data.message });
+        renderData(data);
+      })
+      .withFailureHandler(function(err) { SwalPremium.fire({ icon: 'error', title: 'การเชื่อมต่อล้มเหลว', text: err.message }); })
+      .getAdministratorDashboardData();
+  }
+
+  function renderData(data) {
+    try { 
+      const statQ = document.getElementById('statQuestions');
+      if (statQ) statQ.innerText = data.totalQuestions || 0;
+
+      const statUsers = document.getElementById('statUsers');
+      if (statUsers) statUsers.innerText = data.totalUsers || 0;
+
+      let domCounts = {};
+      if (data.usersList && data.usersList.length > 0) {
+         data.usersList.forEach(u => {
+            if (u && u[11]) {
+               let dom = u[11].toString().trim();
+               if (dom && !dom.startsWith("{")) {
+                  domCounts[dom] = (domCounts[dom] || 0) + 1;
+               }
+            }
+         });
+      }
+
+      const canvas = document.getElementById('adminPieChart');
+      if(canvas && typeof Chart !== 'undefined') {
+        const ctx = canvas.getContext('2d');
+        if(window.myAdminChart) window.myAdminChart.destroy();
+
+        let labelsData = Object.keys(domCounts);
+        let valuesData = Object.values(domCounts);
+        let bgColors = ['#4361ee', '#4cc9f0', '#4895ef', '#3f37c9', '#f72585', '#7209b7', '#b5179e', '#560bad'];
+
+        if(labelsData.length === 0) {
+          labelsData = ["ยังไม่มีการประเมิน"];
+          valuesData = [1];
+          bgColors = ['#e2e8f0'];
+        }
+
+        window.myAdminChart = new Chart(ctx, {
+          type: 'doughnut',
+          data: { 
+            labels: labelsData, 
+            datasets: [{ data: valuesData, backgroundColor: bgColors, borderWidth: 0 }] 
+          },
+          options: { 
+            responsive: true, maintainAspectRatio: false, cutout: '75%', 
+            plugins: { legend: { position: 'right', labels: { font: { family: 'Prompt', size: 12 }, usePointStyle: true } } } 
+          }
+        });
+      }
+
+      let dashTableHtml = '';
+      if (data.usersList && data.usersList.length > 0) {
+        let recent = data.usersList.slice(0, 10);
+        recent.forEach(u => {
+          let dateObj = new Date(u[0]);
+          let shortDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('th-TH', {day:'numeric', month:'short'}) + ' ' + dateObj.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) : u[0];
+
+          dashTableHtml += `<tr>
+            <td class="text-muted small py-3 px-3">${shortDate}</td>
+            <td class="fw-bold text-dark py-3">${u[1] || '-'}</td>
+            <td class="text-muted py-3">${u[2] || '-'}</td>
+            <td class="py-3 text-center">
+              <span class="badge rounded-pill px-3 py-2 shadow-sm" style="background: rgba(67, 97, 238, 0.1); color: #4318ff; font-weight: 600; font-size: 0.8rem;">
+                ${u[11] || '-'}
+              </span>
+            </td>
+          </tr>`;
+        });
+      } else {
+        dashTableHtml = '<tr><td colspan="4" class="text-center py-5 text-muted">ยังไม่มีประวัติการประเมินในระบบ</td></tr>';
+      }
+      const dashTBody = document.getElementById('adminTableBody');
+      if(dashTBody) dashTBody.innerHTML = dashTableHtml;
+
+      let qTable = document.getElementById('tableQuestions');
+      let paginationControls = document.getElementById('paginationControls');
+      let pageInfo = document.getElementById('pageInfo');
+      
+      if (qTable) { 
+        if (!data.questionsList || data.questionsList.length === 0) {
+          globalQuestions = [];
+          qTable.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted">ยังไม่มีข้อคำถามในคลัง</td></tr>';
+          if(paginationControls) paginationControls.innerHTML = '';
+          if(pageInfo) pageInfo.innerText = 'ไม่พบรายการคำถาม';
+        } else {
+          globalQuestions = data.questionsList.filter(q => q && q[0]); 
+          renderQuestionsTable(1); 
+        }
+      }
+
+      let uTable = document.getElementById('tableUsers');
+      if (uTable) { 
+        if (!data.usersList || data.usersList.length === 0) {
+          uTable.innerHTML = '<tr><td colspan="4" class="text-center py-5 text-muted">ยังไม่มีข้อมูลผู้ใช้งาน</td></tr>';
+        } else {
+          let htmlString = '';
+          data.usersList.forEach(u => {
+            if (!u || !u[0]) return; 
+            let formattedDate = u[0];
+            htmlString += `
+              <tr>
+                <td class="text-muted">${formattedDate}</td>
+                <td class="fw-bold" style="color: #2b3674;">${u[1] || '-'}</td>
+                <td><span class="badge-premium">${u[11] || '-'}</span></td>
+                <td class="text-center">
+                  <button class="btn-icon border-0 bg-transparent text-danger" onclick="executeDeleteUser('${u[0]}')" title="ลบข้อมูล"><i class="fa-solid fa-trash"></i></button>
+                </td>
+              </tr>
+            `;
+          });
+          uTable.innerHTML = htmlString;
+        }
+      }
+    } catch (error) { console.error("Error UI: ", error); }
+  }
+
+  function renderQuestionsTable(page) {
+    currentQPage = page;
+    let qTable = document.getElementById('tableQuestions');
+    if(!qTable) return;
+    qTable.innerHTML = '';
+
+    let start = (page - 1) * qRowsPerPage;
+    let end = start + qRowsPerPage;
+    let paginatedItems = globalQuestions.slice(start, end);
+
+    paginatedItems.forEach(q => {
+      let qTextSafe = q[1].replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      qTable.innerHTML += `
+        <tr>
+          <td class="text-muted">${q[0]}</td>
+          <td>${q[1]}</td>
+          <td><span class="badge-premium">${q[2]}</span></td>
+          <td class="text-center">
+            <button class="btn-icon btn-icon-edit border-0 bg-transparent text-primary me-2" onclick="openEditModal('${q[0]}', '${qTextSafe}', '${q[2]}')" title="แก้ไข"><i class="fa-solid fa-pen"></i></button>
+            <button class="btn-icon border-0 bg-transparent text-danger" onclick="executeDeleteQuestion('${q[0]}')" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+          </td>
+        </tr>
+      `;
+    });
+    renderPaginationControls(globalQuestions.length, page);
+  }
+
+  function renderPaginationControls(totalItems, currentPage) {
+    let totalPages = Math.ceil(totalItems / qRowsPerPage);
+    let paginationHtml = '';
+    let paginationControls = document.getElementById('paginationControls');
+    let pageInfo = document.getElementById('pageInfo');
+
+    if(!paginationControls || !pageInfo) return;
+    if (totalPages <= 1) {
+      paginationControls.innerHTML = '';
+      pageInfo.innerText = `แสดงทั้งหมด ${totalItems} รายการ`;
+      return;
+    }
+
+    let prevDisabled = currentPage === 1 ? 'disabled' : '';
+    paginationHtml += `<li class="page-item ${prevDisabled}"><button class="page-link" onclick="renderQuestionsTable(${currentPage - 1})"><i class="fa-solid fa-chevron-left"></i></button></li>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+      let activeClass = i === currentPage ? 'active' : '';
+      paginationHtml += `<li class="page-item ${activeClass}"><button class="page-link" onclick="renderQuestionsTable(${i})">${i}</button></li>`;
+    }
+
+    let nextDisabled = currentPage === totalPages ? 'disabled' : '';
+    paginationHtml += `<li class="page-item ${nextDisabled}"><button class="page-link" onclick="renderQuestionsTable(${currentPage + 1})"><i class="fa-solid fa-chevron-right"></i></button></li>`;
+
+    paginationControls.innerHTML = paginationHtml;
+    let startItem = ((currentPage - 1) * qRowsPerPage) + 1;
+    let endItem = Math.min(currentPage * qRowsPerPage, totalItems);
+    pageInfo.innerText = `แสดงรายการที่ ${startItem} ถึง ${endItem} จากทั้งหมด ${totalItems} รายการ`;
+  }
+
+  function openEditModal(id, text, category) {
+    document.getElementById('editQId').value = id;
+    document.getElementById('editQText').value = text;
+    document.getElementById('editQCategory').value = category;
+    
+    document.getElementById('btnEditQCategory').querySelector('span').innerText = category;
+    let items = document.querySelectorAll('#btnEditQCategory + .dropdown-menu .dropdown-item');
+    items.forEach(i => {
+      i.classList.remove('active');
+      if(i.innerText.trim() === category) i.classList.add('active');
+    });
+    if(editModal) editModal.show();
+  }
+
+  function saveEditedQuestion() {
+    const id = document.getElementById('editQId').value;
+    const text = document.getElementById('editQText').value;
+    const cat = document.getElementById('editQCategory').value;
+    if (!text.trim()) return SwalPremium.fire({ icon: 'warning', title: 'ข้อมูลไม่สมบูรณ์', text: 'กรุณากรอกข้อความคำถาม' });
+
+    if(editModal) editModal.hide();
+    SwalPremium.fire({ title: 'กำลังอัปเดต...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+
+    google.script.run
+      .withSuccessHandler(function(res) {
+        SwalPremium.fire({ icon: 'success', title: 'สำเร็จ', text: res, timer: 2000, showConfirmButton: false });
+        requestData(); 
+      })
+      .withFailureHandler(function(err) { SwalPremium.fire({ icon: 'error', title: 'อัปเดตล้มเหลว', text: err.message }); })
+      .editQuestionInSystem(id, text, cat);
+  }
+
+  function executeAddQuestion() {
+    var txt = document.getElementById('inputNewQuestion').value;
+    var cat = document.getElementById('selectCategory').value;
+    if(!txt.trim()) return SwalPremium.fire({ icon: 'warning', title: 'ข้อมูลไม่ครบ', text: 'กรุณาระบุข้อความคำถาม' }); 
+    
+    SwalPremium.fire({ title: 'กำลังบันทึกข้อมูล...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+    google.script.run
+      .withSuccessHandler(res => {
+        SwalPremium.fire({ icon: 'success', title: 'บันทึกสำเร็จ', text: res, timer: 2000, showConfirmButton: false });
+        document.getElementById('inputNewQuestion').value = ''; 
+        requestData(); 
+      })
+      .withFailureHandler(err => { SwalPremium.fire({ icon: 'error', title: 'ผิดพลาด', text: err.message }); })
+      .addQuestionToSystem(txt, cat);
+  }
+
+  function executeDeleteQuestion(id) {
+    SwalPremium.fire({
+      title: 'ลบข้อมูลคำถาม?', text: 'ข้อมูลที่ลบไปจะไม่สามารถนำกลับมาได้',
+      icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบข้อมูล', cancelButtonText: 'ยกเลิก', reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        SwalPremium.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+        google.script.run
+          .withSuccessHandler(res => { SwalPremium.fire({ icon: 'success', title: 'ลบสำเร็จ', text: res, timer: 2000, showConfirmButton: false }); requestData(); })
+          .withFailureHandler(err => { SwalPremium.fire({ icon: 'error', title: 'ผิดพลาด', text: err.message }); })
+          .deleteQuestionFromSystem(id);
+      }
+    });
+  }
+
+  function executeDeleteUser(id) {
+    SwalPremium.fire({
+      title: 'ลบประวัติผู้ใช้งาน?', text: 'ประวัติการประเมินนี้จะหายไปจากระบบทันที',
+      icon: 'warning', showCancelButton: true, confirmButtonText: 'ลบข้อมูล', cancelButtonText: 'ยกเลิก', reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) {
+        SwalPremium.fire({ title: 'กำลังลบ...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+        google.script.run
+          .withSuccessHandler(res => { SwalPremium.fire({ icon: 'success', title: 'ลบสำเร็จ', text: res, timer: 2000, showConfirmButton: false }); requestData(); })
+          .withFailureHandler(err => { SwalPremium.fire({ icon: 'error', title: 'ผิดพลาด', text: err.message }); })
+          .deleteUserData(id);
+      }
+    });
+  }
+
+  function loadSystemSettings() {
+    google.script.run
+      .withSuccessHandler(function(settings) {
+        if(!settings.error) {
+          const apiEl = document.getElementById('inputApiKey');
+          const promptEl = document.getElementById('inputAiPrompt');
+          if(apiEl) apiEl.value = settings.apiKey;
+          if(promptEl) promptEl.value = settings.prompt;
+        }
+      })
+      .getSystemSettings();
+  }
+
+  function executeSaveSettings() {
+    const apiKey = document.getElementById('inputApiKey').value;
+    const promptText = document.getElementById('inputAiPrompt').value;
+    SwalPremium.fire({ title: 'กำลังบันทึกการตั้งค่า...', allowOutsideClick: false, didOpen: () => { Swal.showLoading(); }});
+    google.script.run
+      .withSuccessHandler(function(res) { SwalPremium.fire({ icon: 'success', title: 'อัปเดตสำเร็จ', text: res, timer: 2000, showConfirmButton: false }); })
+      .withFailureHandler(function(err) { SwalPremium.fire({ icon: 'error', title: 'การบันทึกล้มเหลว', text: err.message }); })
+      .saveSystemSettings(apiKey, promptText);
+  }
+
+  function toggleApiKeyVisibility(btnElement) {
+    const apiKeyInput = document.getElementById('inputApiKey');
+    const icon = btnElement.querySelector('i');
+    if (apiKeyInput.type === 'password') {
+      apiKeyInput.type = 'text';
+      icon.classList.remove('fa-eye', 'text-muted');
+      icon.classList.add('fa-eye-slash', 'text-primary');
+    } else {
+      apiKeyInput.type = 'password';
+      icon.classList.remove('fa-eye-slash', 'text-primary');
+      icon.classList.add('fa-eye', 'text-muted');
+    }
+  }
+
+  function updateDropdown(inputId, buttonId, value, element) {
+    document.getElementById(inputId).value = value;
+    document.getElementById(buttonId).querySelector('span').innerText = value;
+    let items = element.closest('.dropdown-menu').querySelectorAll('.dropdown-item, button, a');
+    items.forEach(i => i.classList.remove('active'));
+    element.classList.add('active');
+  }
+
+  function confirmExit() {
+    SwalPremium.fire({
+      iconHtml: '<i class="fa-solid fa-arrow-right-from-bracket" style="color: #ef4444;"></i>',
+      title: 'ยืนยันการออกจากระบบ?',
+      html: 'ระบบจะพาคุณกลับไปที่หน้าแรก',
+      showCancelButton: true, confirmButtonText: 'ออกจากระบบ', cancelButtonText: 'ยกเลิก', reverseButtons: true
+    }).then((result) => {
+      if (result.isConfirmed) { 
+        if (typeof WEB_APP_URL !== 'undefined' && WEB_APP_URL !== '') {
+          window.top.location.href = WEB_APP_URL; 
+        } else {
+          window.top.location.href = window.location.href.split('?')[0];
+        }
+      }
+    });
+  }
+</script>

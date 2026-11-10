@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <title>ระบบประเมินพหุปัญญาเพื่อแนะแนวการศึกษา สำหรับชั้นมัธยมศึกษาปีที่ 3</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <?!= include('CSS'); ?>
+</head>
+<body>
+
+  <div id="fullPageLoader">
+    <div class="spinner-border text-primary" style="width: 4rem; height: 4rem;" role="status"></div>
+    <h4 class="mt-4 fw-bold text-primary" id="loaderText">กำลังประมวลผล...</h4>
+    <p class="text-muted" id="loaderSubText">กำลังวิเคราะห์แนวทางการศึกษาต่อ...</p>
+  </div>
+
+  <div class="hero-wrapper">
+    
+    <div class="top-navbar" style="position: absolute; top: 0; left: 0; width: 100%; z-index: 1000; padding: 15px 5%; display: flex; justify-content: space-between; align-items: center; pointer-events: none;">
+
+      <div style="pointer-events: auto; display: flex; align-items: center; max-width: 75%;">
+        <div class="nav-logo-box" style="background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.9); padding: 6px 18px 6px 6px; border-radius: 50px; display: flex; align-items: center; gap: 12px; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);">
+          
+          <div class="nav-icon-circle" style="width: 38px; height: 38px; border-radius: 50%; background: linear-gradient(135deg, #8b5cf6, #6366f1); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3); flex-shrink: 0;">
+            <i class="fa-solid fa-compass" style="color: #ffffff; font-size: 1.1rem;"></i>
+          </div>
+          
+          <div class="nav-text-group" style="display: flex; flex-direction: column; justify-content: center; line-height: 1.25;">
+            <span class="nav-logo-main" style="font-family: 'Prompt', sans-serif; font-weight: 700; color: #1e293b; font-size: 0.95rem;">
+              ระบบแบบประเมินความถนัดทางพหุปัญญา
+            </span>
+            <span class="nav-logo-sub" style="font-family: 'Prompt', sans-serif; font-weight: 500; color: #64748b; font-size: 0.75rem;">
+              สำหรับนักเรียนมัธยมศึกษาปีที่ 3
+            </span>
+          </div>
+          
+        </div>
+      </div>
+
+      <div class="nav-actions" style="pointer-events: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0;">
+        <button class="btn btn-link text-decoration-none nav-info-btn" style="color: #475569; font-weight: 600; font-size: 0.9rem; padding: 5px 10px;" onclick="showProjectInfo()">
+          <i class="fa-regular fa-circle-question"></i> 
+          <span class="ms-1">ข้อมูลเพิ่มเติม</span>
+        </button>
+        <button class="btn-outline btn-sm nav-logout-btn" onclick="logout()" id="navLogoutBtn" style="display:none; background: rgba(255,255,255,0.9); border: 1px solid #cbd5e1; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-radius: 12px; padding: 6px 12px;">
+          <i class="fa-solid fa-arrow-right-from-bracket text-danger"></i> 
+          <span class="ms-1 fw-bold" style="color: #1e293b;">ออก</span>
+        </button>
+      </div>
+      
+    </div>
+
+    <div class="container" style="max-width: 1200px; width: 100%;">
+      
+      <div id="loginSection" class="card-container text-center mx-auto animate-item" style="max-width: 440px; position: relative; z-index: 10; padding: 50px 40px;">
+        <div class="icon-circle mx-auto mb-4"><i class="fa-solid fa-user-graduate"></i></div>
+        
+        <h3 class="fw-bold mb-3" style="font-size: 1.35rem; color: #1e293b; line-height: 1.5;">
+          แบบประเมินความถนัดทางพหุปัญญา<br>
+          <span style="font-size: 1.1rem; color: #5b21b6;">สำหรับนักเรียนชั้นมัธยมศึกษาปีที่ 3</span>
+        </h3>
+        <p class="text-muted mx-auto mb-4 pb-2" style="font-size: 0.95rem;">กรุณากรอกข้อมูลเพื่อเข้าสู่ระบบประเมิน</p>
+        
+        <div class="text-start">
+          <div class="smart-input-group mb-4" id="grpName">
+            <input type="text" id="userName" placeholder=" ">
+            <label>ชื่อผู้ใช้</label>
+            <div class="error-text" id="nameErrorMsg">กรุณาระบุชื่อให้ครบถ้วน</div>
+          </div>
+          
+          <div class="smart-input-group mb-4" id="grpEmail">
+            <input type="text" id="email" placeholder=" ">
+            <label>อีเมล</label>
+            <div class="error-text" id="emailErrorMsg">กรุณาระบุรูปแบบอีเมลให้ถูกต้อง</div>
+          </div>
+          
+          <button type="button" id="studentLoginBtn" class="btn-gradient w-100 py-3 mt-3" onclick="handleStudentLogin()">เริ่มทำแบบประเมิน <i class="fa-solid fa-arrow-right ms-2"></i></button>
+
+          <div id="adminAuthSection" style="display: none;">
+            <hr class="my-4">
+            <div class="text-center mb-3"><span class="badge bg-dark text-white py-2 px-3 rounded-pill"><i class="fa-solid fa-shield-halved me-1"></i> โหมดแอดมิน</span></div>
+            <div class="smart-input-group mb-3" id="grpAdminPwd">
+              <input type="password" id="adminPwd" placeholder=" ">
+              <label>รหัสผ่าน</label>
+              <div class="error-text">รหัสผ่านไม่ถูกต้อง</div>
+            </div>
+            <button type="button" class="btn btn-dark w-100 rounded-pill py-3 fw-bold" onclick="handleAdminLogin()">เข้าสู่แผงควบคุมสถิติ</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="assessmentSection" style="display: none; max-width: 900px; margin: 0 auto; position: relative; z-index: 10;">
+        
+       <div id="stickyProgressContainer" style="position: sticky; top: 0; z-index: 2000; margin-bottom: 30px;">
+          <div style="background: rgba(255, 255, 255, 0.98); border-bottom: 1px solid rgba(139, 92, 246, 0.2); box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); padding: 25px 35px; border-radius: 0 0 28px 28px; margin: 0 -15px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <span class="fw-bold" style="color: #5b21b6; font-size: 1.2rem;"><i class="fa-solid fa-pen-to-square me-2"></i><span id="displayName"></span></span>
+              <span id="progressText" class="badge py-2 px-3 rounded-pill" style="background: #f3e8ff; color: #5b21b6; border: 1px solid #ddd6fe; font-size: 0.95rem;">0 / 64 ข้อ</span>
+            </div>
+            <div class="progress" style="height: 12px; border-radius: 20px; background-color: #f1f5f9; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
+              <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%; background: linear-gradient(90deg, #5b21b6, #8b5cf6); border-radius: 20px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-container mb-4 shadow-sm animate-item" style="background: #ffffff; border-left: 6px solid #8b5cf6; padding: 20px 30px !important; border-radius: 20px;">
+          <div class="d-flex align-items-start gap-3">
+            <i class="fa-solid fa-quote-left mt-1" style="color: #c084fc; font-size: 1.5rem;"></i>
+            <div>
+              <h5 class="fw-bold mb-1 text-dark">ยินดีต้อนรับ, <span id="welcomeName" style="color: #5b21b6;"></span></h5>
+              <p class="text-muted mb-0" style="font-size: 0.95rem;">กรุณาเลือกคะแนนที่ตรงกับตัวคุณมากที่สุด (ไม่มีคำตอบที่ผิด)</p>
+            </div>
+          </div>
+        </div>
+        
+        <div id="questionsContainer"></div>
+        
+        <div class="card-container text-center mt-4 mb-5 p-5">
+            <h4 class="fw-bold mb-4" style="color: #1e293b;">ตรวจสอบความเรียบร้อยก่อนส่ง</h4>
+            <button type="button" class="btn-gradient w-75 mx-auto py-3" onclick="submitAssessment()"><i class="fa-solid fa-microchip me-2"></i> วิเคราะห์แผนการเรียน</button>
+        </div>
+      </div>
+
+      <div id="resultSection" style="display: none; width: 100%; max-width: 1100px; margin: 0 auto; position: relative; z-index: 10;">
+         <div id="pdfContentArea" class="pb-5">
+            
+            <div class="report-header-card animate-item mb-4">
+              <div class="d-flex align-items-center gap-4">
+                <div class="icon-soft" style="background: #eef2ff; color: #5b21b6; width: 70px; height: 70px; font-size: 2rem; border-radius: 18px;"><i class="fa-solid fa-file-contract"></i></div>
+                <div>
+                  <div class="text-muted small fw-bold text-uppercase" style="letter-spacing: 1px;">รายงานผลวิเคราะห์สำหรับ</div>
+                  <h3 class="fw-bold text-dark mb-0 mt-1" id="resName">ชื่อ นามสกุล</h3>
+                  <div class="text-muted small mt-1"><i class="fa-regular fa-clock me-1"></i> ประเมินเมื่อ: <span id="resDate">วันที่ประเมิน</span></div>
+                </div>
+              </div>
+              <div class="d-flex gap-3 mt-3 mt-md-0" data-html2canvas-ignore>
+<button type="button" class="btn-gradient" onclick="downloadImage()" style="padding: 10px 24px; font-size: 1rem;">
+  <i class="fa-solid fa-image me-2"></i>ดาวน์โหลดผลลัพธ์
+</button>
+              </div>
+            </div>
+
+            
+            <!-- เริ่มต้น: ส่วนแสดงผลแผนการเรียน Top 3 (แทรกใน id="resultSection") -->
+            <div class="top-3-container mb-5 mt-4">
+              <div class="text-center mb-5">
+
+                <h2 class="fw-bold text-primary" style="font-family: 'Prompt', sans-serif;">🏆 3 อันดับแผนการเรียนที่เหมาะสมกับคุณที่สุด</h2>
+                <p class="text-muted">วิเคราะห์จากความถนัดพหุปัญญาทั้ง 8 ด้านของคุณ</p>
+              </div>
+
+              <div class="row justify-content-center align-items-end g-4 px-3">
+                <!-- อันดับ 2 (ซ้าย) -->
+                <div class="col-12 col-md-4 order-2 order-md-1">
+                  <div class="plan-card rank-2 text-center p-4 h-100 bg-white shadow-sm">
+                    <div class="rank-badge"><i class="fa-solid fa-medal me-1"></i> อันดับ 2</div>
+                    <h4 id="planName2" class="fw-bold mt-4 text-dark">-</h4>
+                    <div class="progress-wrapper mt-4">
+                      <div class="d-flex justify-content-between mb-1">
+                        <span class="small text-muted fw-bold">ความเหมาะสม</span>
+                        <span id="planPct2" class="small fw-bold text-info">0%</span>
+                      </div>
+                      <div class="progress" style="height: 10px; border-radius: 10px;">
+                        <div id="planBar2" class="progress-bar bg-info progress-bar-striped progress-bar-animated" style="width: 0%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- อันดับ 1 (ตรงกลาง ใหญ่สุด) -->
+                <div class="col-12 col-md-4 order-1 order-md-2" style="z-index: 10;">
+                  <div class="plan-card rank-1 text-center p-4 h-100 bg-white shadow-lg border-primary" style="transform: scale(1.05);">
+                    <div class="rank-badge bg-warning text-dark border-0 shadow-sm"><i class="fa-solid fa-crown me-1"></i> อันดับ 1</div>
+                    <h3 id="planName1" class="fw-bold mt-4 text-primary" style="font-size: 1.8rem;">-</h3>
+                    <div class="progress-wrapper mt-4">
+                      <div class="d-flex justify-content-between mb-1">
+                        <span class="small text-muted fw-bold">ความเหมาะสม</span>
+                        <span id="planPct1" class="small fw-bold text-primary" style="font-size: 1.1rem;">0%</span>
+                      </div>
+                      <div class="progress" style="height: 14px; border-radius: 10px; background-color: #e0e7ff;">
+                        <div id="planBar1" class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width: 0%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- อันดับ 3 (ขวา) -->
+                <div class="col-12 col-md-4 order-3 order-md-3">
+                  <div class="plan-card rank-3 text-center p-4 h-100 bg-white shadow-sm">
+                    <div class="rank-badge"><i class="fa-solid fa-award me-1"></i> อันดับ 3</div>
+                    <h5 id="planName3" class="fw-bold mt-4 text-dark">-</h5>
+                    <div class="progress-wrapper mt-4">
+                      <div class="d-flex justify-content-between mb-1">
+                        <span class="small text-muted fw-bold">ความเหมาะสม</span>
+                        <span id="planPct3" class="small fw-bold text-secondary">0%</span>
+                      </div>
+                      <div class="progress" style="height: 10px; border-radius: 10px;">
+                        <div id="planBar3" class="progress-bar bg-secondary progress-bar-striped progress-bar-animated" style="width: 0%;"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- สิ้นสุด: ส่วนแสดงผลแผนการเรียน Top 3 -->
+
+            <div class="row g-4">
+              <div class="col-lg-5">
+                <div class="dom-banner mb-4 animate-item">
+                  <i class="fa-solid fa-brain bg-icon"></i>
+                  <div class="badge bg-white text-dark rounded-pill px-3 py-2 mb-3 fw-bold shadow-sm" style="color: #5b21b6 !important;">ความถนัดอันดับ 1</div>
+                  <h2 class="fw-bold mb-1" id="resDomName" style="font-size: 2.2rem; line-height: 1.3;">...</h2>
+                  <h1 class="fw-bold mb-0" id="resDomPercent" style="font-size: 3.8rem;">0%</h1>
+                </div>
+                
+                <div class="card-container animate-item" style="padding: 30px !important;">
+                  <h6 class="section-title mb-4"><i class="fa-solid fa-bars-staggered" style="color: #8b5cf6;"></i> คะแนนรายด้าน</h6>
+                  <div id="scoreBarsContainer"></div>
+                </div>
+              </div>
+
+              <div class="col-lg-7">
+                <div class="card-container h-100 animate-item" style="padding: 40px !important;">
+                   
+                   <div class="mb-5">
+                      <h4 class="section-title border-bottom pb-3"><i class="fa-solid fa-user-astronaut" style="color: #8b5cf6;"></i> บทสรุปศักยภาพและจุดแข็ง</h4>
+                      <p class="neat-text mt-3" id="aiSummary"></p>
+                   </div>
+
+                   <h4 class="section-title border-bottom pb-3"><i class="fa-solid fa-graduation-cap text-success"></i> ข้อเสนอแนะการศึกษาต่อ</h4>
+                   <div class="row g-3 mb-5 mt-2">
+                      <div class="col-md-6">
+                         <div class="result-box box-academic shadow-sm h-100" style="padding: 25px;">
+                            <div class="box-header mb-3">
+                              <div class="icon-soft icon-blue"><i class="fa-solid fa-school"></i></div>
+                              <h6 class="fw-bold mb-0 text-dark">สายสามัญ<br><small class="text-muted fw-normal" style="font-size: 0.85rem;">(ม.ปลาย)</small></h6>
+                            </div>
+                            <p class="neat-text mb-0" id="aiAcademic"></p>
+                         </div>
+                      </div>
+                      <div class="col-md-6">
+                         <div class="result-box box-vocational shadow-sm h-100" style="padding: 25px;">
+                            <div class="box-header mb-3">
+                              <div class="icon-soft icon-orange"><i class="fa-solid fa-tools"></i></div>
+                              <h6 class="fw-bold mb-0 text-dark">สายอาชีพ<br><small class="text-muted fw-normal" style="font-size: 0.85rem;">(ปวช.)</small></h6>
+                            </div>
+                            <p class="neat-text mb-0" id="aiVocational"></p>
+                         </div>
+                      </div>
+                   </div>
+
+                   <div class="row g-4 mb-4">
+                      <div class="col-md-6">
+                         <h6 class="section-title mb-3" style="font-size: 1.15rem;"><i class="fa-solid fa-lightbulb text-warning"></i> เทคนิคการเรียนรู้</h6>
+                         <p class="neat-text" id="aiLearning"></p>
+                      </div>
+                      <div class="col-md-6">
+                         <h6 class="section-title mb-3" style="font-size: 1.15rem;"><i class="fa-solid fa-briefcase text-info"></i> เส้นทางอาชีพ</h6>
+                         <div class="career-tags" id="aiCareer"></div>
+                      </div>
+                   </div>
+
+                   <div class="mt-auto pt-4 border-top">
+                      <p class="neat-text text-center fw-medium mb-0" id="aiDevText" style="color: #8b5cf6; font-size: 0.95rem;"></p>
+                   </div>
+                </div>
+              </div>
+            </div>
+         </div> 
+      </div>
+
+      <div id="adminSection" class="card-container mx-auto animate-item" style="display: none; max-width: 950px; padding: 40px;">
+        <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+          <h4 class="fw-bold mb-0" style="color: #5b21b6;"><i class="fa-solid fa-chart-pie me-2"></i> สถิติภาพรวม (Dashboard)</h4>
+        </div>
+
+        <div class="row mb-4 g-4">
+          <div class="col-md-4">
+            <div class="rounded-4 p-4 text-center text-white shadow-sm h-100 d-flex flex-column justify-content-center" style="background: linear-gradient(135deg, #8b5cf6 0%, #c084fc 100%);">
+              <h6 class="opacity-75 mb-1">ยอดทำประเมินทั้งหมด</h6>
+              <h1 class="fw-bold display-4 mb-0" id="dashTotalUsers">0</h1>
+              <div class="small mt-2 opacity-75">คน</div>
+            </div>
+          </div>
+          <div class="col-md-8">
+             <div class="bg-light p-3 rounded-4 border h-100 d-flex flex-column justify-content-center">
+                <h6 class="fw-bold mb-3 text-center text-muted">สัดส่วนความถนัดภาพรวม</h6>
+                <div style="position: relative; height: 220px; width:100%;"><canvas id="adminPieChart"></canvas></div>
+             </div>
+          </div>
+        </div>
+        
+        <div class="table-responsive rounded-4 border overflow-hidden mt-3 shadow-sm">
+          <table class="table table-hover bg-white mb-0">
+            <thead class="text-center" style="background-color: #f8fafc;">
+              <tr>
+                <th class="py-3 text-muted font-weight-bold">เวลาที่ประเมิน</th>
+                <th class="py-3 text-muted font-weight-bold">ชื่อผู้ใช้</th>
+                <th class="py-3 text-muted font-weight-bold">อีเมล</th>
+                <th class="py-3 text-muted font-weight-bold">ความถนัดอันดับ 1</th>
+              </tr>
+            </thead>
+            <tbody id="adminTableBody" class="text-center align-middle"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div> 
+  </div> 
+
+  <?!= include('JS'); ?>
+
+</body>
+</html>

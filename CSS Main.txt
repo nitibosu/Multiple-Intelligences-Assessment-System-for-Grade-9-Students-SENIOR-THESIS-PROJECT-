@@ -1,0 +1,252 @@
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
+  
+  :root { 
+    --primary: #5b21b6; --primary-light: #8b5cf6; --secondary: #c084fc; 
+    --bg-main: #f8fafc; --surface: rgba(255, 255, 255, 0.85); --text-dark: #1e293b; --text-muted: #64748b;
+    --error-color: #ef4444;
+  }
+  
+  /* แก้บัค Scrollbar ซ้อนทับ */
+  body { 
+    background-color: var(--bg-main); font-family: 'Prompt', sans-serif; color: var(--text-dark); 
+    overflow-x: hidden; /* ล็อกด้านข้างเฉพาะที่ Body */
+    -webkit-tap-highlight-color: transparent; 
+  }
+  
+  /* 🌟 1. Navbar */
+  .luxury-nav { background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-bottom: 1px solid rgba(255,255,255,0.4); position: sticky; top: 0; z-index: 1000; padding: 12px 0; box-shadow: 0 4px 20px rgba(0,0,0,0.02); }
+  .brand-logo { font-size: 1.8rem; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 2px 4px rgba(139, 92, 246, 0.2)); }
+  
+  /* 🌟 2. พื้นหลัง Aurora (แก้บัคหน้าจอไหลเอง & ช่องว่างทะลุขอบ) */
+  .hero-wrapper { 
+    background: linear-gradient(-45deg, #eef2ff, #e0e7ff, #ede9fe, #fae8ff);
+    background-size: 400% 400%; animation: gradientBG 15s ease infinite; position: relative; 
+    min-height: 100vh; height: auto; display: block; /* ล็อกเลย์เอาต์ให้เสถียร ไม่ให้ขยับ */
+    padding: 12vh 20px 60px 20px; z-index: 1;
+  }
+  @keyframes gradientBG { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+  /* 🚨 อัปเกรด: เปลี่ยนจาก Absolute เป็น Fixed ล็อกลูกแก้วไว้กับที่ไม่ให้ดันหน้าจอ */
+  .hero-wrapper::before, .hero-wrapper::after {
+    content: ''; position: fixed; border-radius: 50%; filter: blur(100px); z-index: -1; 
+    pointer-events: none; animation: floatAurora 15s infinite alternate ease-in-out;
+  }
+  .hero-wrapper::before { width: 55vw; height: 55vw; background: rgba(99, 102, 241, 0.35); top: -10%; left: -10%; }
+  .hero-wrapper::after { width: 45vw; height: 45vw; background: rgba(168, 85, 247, 0.35); bottom: -10%; right: -10%; animation-delay: -7s; }
+  
+  @keyframes floatAurora { 
+    0% { transform: translate(0, 0) scale(1); } 
+    100% { transform: translate(30px, 30px) scale(1.1); } /* ลดระยะการขยับลง ป้องกันบัค */
+  }
+  
+  /* 🌟 3. Card Container */
+  .card-container { 
+    background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
+    border-radius: 36px; padding: 45px 35px; width: 100%; margin: 0 auto;
+    box-shadow: 0 30px 60px rgba(15, 23, 42, 0.08), inset 0 2px 6px rgba(255,255,255,0.9); 
+    border: 1px solid rgba(255,255,255,0.8); position: relative; z-index: 10; 
+  }
+  .icon-circle { width: 85px; height: 85px; background: linear-gradient(135deg, var(--primary-light), var(--secondary)); color: white; border-radius: 26px; display: flex; align-items: center; justify-content: center; font-size: 2.5rem; box-shadow: 0 16px 32px rgba(139, 92, 246, 0.3), inset 0 2px 4px rgba(255,255,255,0.4); margin: 0 auto; transition: transform 0.3s; }
+  .icon-circle:hover { transform: scale(1.05); }
+
+  /* 🌟 4. Input Fields */
+  .smart-input-group { position: relative; margin-bottom: 1.5rem; text-align: left; width: 100%; }
+  .smart-input-group input { width: 100%; height: 64px; padding: 1.6rem 1.2rem 0.4rem 1.2rem; font-size: 1.05rem; border: 1.5px solid #cbd5e1; border-radius: 16px; background: #f8fafc; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02); transition: all 0.3s ease; outline: none; color: #0f172a; font-weight: 500;}
+  .smart-input-group label { position: absolute; left: 1.2rem; top: 20px; color: #64748b; font-size: 1.05rem; transition: all 0.3s; pointer-events: none; margin: 0; padding: 0;}
+  .smart-input-group input:focus, .smart-input-group input:not(:placeholder-shown) { background: #ffffff; border-color: var(--primary-light); box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15); }
+  .smart-input-group input:focus + label, .smart-input-group input:not(:placeholder-shown) + label { top: 10px; font-size: 0.8rem; font-weight: 600; color: var(--primary); }
+  .error-text { font-size: 0.85rem; padding-left: 1rem; margin-top: 6px; display: none !important; color: var(--error-color); font-weight: 500;}
+  .smart-input-group.error input { border-color: var(--error-color); background: #fef2f2; box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15); }
+  .smart-input-group.error label { color: var(--error-color) !important; }
+  .smart-input-group.error .error-text { display: block !important; animation: fadeInUp 0.3s ease; }
+
+  /* 🌟 5. Buttons */
+  .btn-gradient { background: linear-gradient(135deg, var(--primary), var(--primary-light)); border: none; border-radius: 20px; padding: 16px 24px; font-size: 1.1rem; font-weight: 600; color: white; transition: all 0.2s; box-shadow: 0 10px 20px rgba(91, 33, 182, 0.25), inset 0 2px 0 rgba(255,255,255,0.15); width: 100%;}
+  .btn-gradient:hover { transform: translateY(-2px); box-shadow: 0 15px 30px rgba(91, 33, 182, 0.35); }
+  .btn-outline { background: rgba(255,255,255,0.5); border: 1px solid #cbd5e1; color: var(--text-dark); border-radius: 12px; padding: 8px 16px; font-weight: 600; transition: all 0.2s; backdrop-filter: blur(10px); }
+
+  /* 🌟 6. Questions */
+  .question-box { background: rgba(255,255,255,0.9); padding: 30px; border-radius: 24px; margin-bottom: 20px; border: 1px solid #e2e8f0; border-left: 5px solid var(--primary-light); box-shadow: 0 8px 20px rgba(0,0,0,0.02); transition: all 0.3s; }
+  .question-box.unanswered-error { border: 2px solid var(--error-color); background-color: #fff5f5; border-left-width: 5px; border-left-color: var(--error-color);}
+  .custom-radio-group { display: flex; gap: 8px; margin-top: 20px; }
+  .custom-radio-group input[type="radio"] { display: none; }
+  .custom-radio-group label { flex: 1; text-align: center; padding: 14px 4px; background: #f8fafc; border: 2px solid transparent; border-radius: 16px; cursor: pointer; transition: all 0.2s; color: #64748b; }
+  .custom-radio-group label .num { font-size: 1.2rem; font-weight: 700; margin-bottom: 2px; display: block; }
+  .custom-radio-group label .desc { font-size: 0.75rem; font-weight: 500; }
+  .custom-radio-group input[type="radio"]:checked + label { background: #ffffff; border-color: var(--primary-light); color: var(--primary); box-shadow: 0 8px 20px rgba(139, 92, 246, 0.15); transform: translateY(-3px) scale(1.03); }
+
+  /* 🌟 7. Result Section */
+  .report-header-card { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(20px); border-radius: 28px; padding: 25px 30px; box-shadow: 0 12px 30px rgba(0,0,0,0.03); border: 1px solid rgba(255,255,255,0.6); display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px;}
+  .section-title { font-size: 1.2rem; font-weight: 700; color: var(--text-dark); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; }
+  .neat-text { font-size: 0.95rem; line-height: 1.7; color: var(--text-muted); font-weight: 400; }
+  .result-box { background: rgba(255,255,255,0.85); border-radius: 24px; padding: 25px; border: 1px solid rgba(255,255,255,0.6); height: 100%; position: relative; overflow: hidden; box-shadow: 0 8px 25px rgba(0,0,0,0.02); }
+  .result-box::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+  .box-academic::before { background: linear-gradient(to bottom, #3b82f6, #60a5fa); }
+  .box-vocational::before { background: linear-gradient(to bottom, #f59e0b, #fbbf24); }
+  .box-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  .icon-soft { width: 45px; height: 45px; border-radius: 14px; display: flex; justify-content: center; align-items: center; font-size: 1.2rem; }
+  .icon-blue { background: #eff6ff; color: #2563eb; }
+  .icon-orange { background: #fff7ed; color: #d97706; }
+  .dom-banner { background: linear-gradient(135deg, var(--primary), var(--primary-light)); color: white; border-radius: 28px; padding: 35px; position: relative; overflow: hidden; box-shadow: 0 20px 40px rgba(91, 33, 182, 0.25); }
+  .dom-banner .bg-icon { position: absolute; right: -20px; top: -20px; font-size: 12rem; opacity: 0.1; transform: rotate(15deg); }
+  .score-row { margin-bottom: 15px; }
+  .score-label { display: flex; justify-content: space-between; font-weight: 600; font-size: 0.9rem; margin-bottom: 6px; color: var(--text-dark);}
+  .score-bar-bg { background-color: rgba(0,0,0,0.05); height: 10px; border-radius: 10px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 10px; transition: width 1.5s ease-out; background: linear-gradient(90deg, var(--primary), var(--secondary));}
+  .career-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .tag-item { background: rgba(255,255,255,0.8); color: var(--primary); padding: 8px 16px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; border: 1px solid #ddd6fe; }
+
+  /* 🌟 8. Mobile & Tablet Adjustments (จัดระเบียบความสมมาตรบนมือถือ 100%) */
+  @media (max-width: 768px) {
+    /* ปรับระยะห่างขอบจอให้พอดี ไม่บีบอัดเกินไป */
+    .hero-wrapper { padding: 90px 10px 40px 10px !important; }
+    
+    /* ย่อขนาดขอบกล่องต่างๆ ให้สมมาตรกับจอมือถือ */
+    .card-container { padding: 25px 20px !important; border-radius: 24px !important; }
+    .question-box { padding: 20px 15px !important; border-radius: 18px !important; }
+
+    /* 🚀 ซ่อมแซมแถบปุ่ม 1-5 ไม่ให้เบียดจนตัวหนังสือตกบรรทัด */
+    .custom-radio-group { gap: 4px !important; }
+    .custom-radio-group label { padding: 10px 2px !important; border-radius: 12px !important; }
+    .custom-radio-group label .num { font-size: 1.05rem !important; }
+    .custom-radio-group label .desc { font-size: 0.65rem !important; letter-spacing: -0.5px; }
+    
+    /* ซ่อมแซมแถบนับข้อ (Docked Header) ด้านบนให้ขอบพอดีกับจอ */
+    #stickyProgressContainer > div { padding: 15px 20px !important; border-radius: 0 0 20px 20px !important; margin: 0 -10px !important; }
+    #progressText { font-size: 0.85rem !important; padding: 5px 12px !important; }
+    
+    /* ย่อขนาดตัวอักษรหัวข้อต่างๆ ลงนิดหน่อย */
+    h3.fw-bold { font-size: 1.25rem !important; }
+    h5.fw-bold { font-size: 1.05rem !important; }
+  }
+
+  @media (max-width: 576px) {
+    /* 🚀 ปรับแถบ Navbar ให้ดูโปร่งและสมดุล ไม่เบียดกัน */
+    .top-navbar { 
+      padding: 15px 10px !important; /* เพิ่มพื้นที่แนวตั้งและข้างขอบ */
+      gap: 10px; /* เพิ่มช่องว่างระหว่างโลโก้กับกลุ่มปุ่ม */
+    }
+    
+    /* ปรับแต่งกล่องโลโก้ให้กะทัดรัดแต่ไม่เบียดตัวหนังสือ */
+    .nav-logo-box { 
+      padding: 6px 12px 6px 6px !important; 
+      gap: 8px !important; 
+      max-width: 60vw; /* จำกัดความกว้างโลโก้ไม่ให้ไปเบียดฝั่งขวา */
+    }
+    
+    .nav-icon-circle { width: 32px !important; height: 32px !important; }
+    
+    /* ย่อตัวหนังสือโลโก้ให้พอดี */
+    .nav-logo-main { font-size: 0.7rem !important; line-height: 1.1; }
+    .nav-logo-sub { font-size: 0.55rem !important; }
+    
+    /* 🌟 จัดการกลุ่มปุ่มฝั่งขวาให้มีระยะห่าง (Breathing Room) */
+    .nav-actions { 
+      gap: 10px !important; /* เพิ่มช่องว่างระหว่าง 'ข้อมูลเพิ่มเติม' กับ 'ปุ่มออก' */
+    }
+
+    .nav-info-btn { 
+      font-size: 0.75rem !important; 
+      white-space: nowrap; /* ป้องกันตัวหนังสือตกบรรทัด */
+    }
+
+    /* ปรับปุ่มออกให้ดูเป็นปุ่มที่กดง่ายและแยกตัวชัดเจน */
+    .nav-logout-btn { 
+      padding: 6px 10px !important; 
+      font-size: 0.75rem !important; 
+      border-radius: 12px !important;
+      background: rgba(255, 255, 255, 0.95) !important;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.08) !important; /* เพิ่มเงาให้ดูเด่นออกมา */
+    }
+    
+    /* ปรับช่องกรอกข้อมูลให้ดูเต็มจอมือถือ */
+    .card-container { padding: 30px 20px !important; }
+  }
+
+  /* 🌟 9. Premium Modal */
+  .glass-popup { background: rgba(255, 255, 255, 0.9) !important; backdrop-filter: blur(20px) !important; -webkit-backdrop-filter: blur(20px) !important; border-radius: 32px !important; border: 1px solid rgba(255,255,255,0.7) !important; box-shadow: 0 30px 60px rgba(15, 23, 42, 0.1) !important; padding: 2.5em 2em 2em 2em !important; }
+  .swal2-backdrop-show { background: rgba(15, 23, 42, 0.4) !important; backdrop-filter: blur(6px) !important; -webkit-backdrop-filter: blur(6px) !important; }
+  .swal2-styled.swal2-confirm { background: linear-gradient(135deg, var(--primary), var(--primary-light)) !important; border-radius: 16px !important; padding: 12px 30px !important; font-family: 'Prompt', sans-serif !important; font-weight: 600 !important; box-shadow: 0 8px 20px rgba(91, 33, 182, 0.25) !important; border: none !important;}
+
+  /* Animations */
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-item { animation: fadeInUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; opacity: 0; }
+  #fullPageLoader { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); z-index: 9999; flex-direction: column; justify-content: center; align-items: center; }
+
+/* 🚨🚨 โหมดสร้างรูปภาพ (ล็อกสัดส่วน Desktop 100% ป้องกันภาพเละ) 🚨🚨 */
+  .image-export-mode {
+    width: 1100px !important;
+    max-width: 1100px !important;
+    margin: 0 auto !important;
+    padding: 40px !important;
+    background: #f8fafc !important; /* สีพื้นหลัง */
+    border-radius: 0 !important;
+  }
+  
+  /* บังคับคอลัมน์ใหญ่ให้เป็น 2 ฝั่ง ซ้าย-ขวาเสมอ ไม่ตกลงมา */
+  .image-export-mode .row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    flex-direction: row !important;
+  }
+  .image-export-mode .col-lg-5 { width: 40% !important; flex: 0 0 40% !important; padding-right: 20px !important; }
+  .image-export-mode .col-lg-7 { width: 60% !important; flex: 0 0 60% !important; }
+  
+  /* บังคับกล่องสายสามัญและสายอาชีพให้อยู่ข้างกัน */
+  .image-export-mode .col-md-6 { width: 50% !important; flex: 0 0 50% !important; }
+  .image-export-mode .col-md-4 { width: 33.33% !important; flex: 0 0 33.33% !important; padding: 0 10px !important; }
+  
+  .image-export-mode .plan-card { transform: none !important; margin-bottom: 20px !important; }
+  .image-export-mode .result-box { box-shadow: none !important; border: 1px solid #cbd5e1 !important; }
+
+/* ปรับแต่งปุ่มใน SweetAlert ให้ดูทันสมัย */
+  .swal-confirm-custom {
+    border-radius: 14px !important;
+    padding: 12px 30px !important;
+    font-family: 'Prompt', sans-serif !important;
+    font-weight: 600 !important;
+  }
+  .swal-cancel-custom {
+    border-radius: 14px !important;
+    padding: 12px 30px !important;
+    font-family: 'Prompt', sans-serif !important;
+    color: #64748b !important; /* สีเทาเข้มให้อ่านง่าย */
+    font-weight: 600 !important;
+  }
+
+  /* =========================================
+     สไตล์สำหรับแสดงผล แผนการเรียน 3 อันดับแรก (Podium Top 3)
+     ========================================= */
+  .top-3-container { padding: 20px 0; }
+  .plan-card { border-radius: 24px; border: 2px solid transparent; position: relative; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+  .plan-card:hover { transform: translateY(-8px) scale(1.02) !important; box-shadow: 0 20px 40px rgba(0,0,0,0.08); }
+  .plan-card.rank-1 { border-color: var(--primary); }
+  .plan-card.rank-2 { border-color: #38bdf8; }
+  .plan-card.rank-3 { border-color: #94a3b8; }
+
+  .rank-badge { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); padding: 6px 24px; border-radius: 30px; font-weight: 700; font-family: 'Prompt', sans-serif; font-size: 0.95rem; background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; white-space: nowrap; }
+  .rank-1 .rank-badge { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: white !important; font-size: 1.1rem; padding: 8px 30px; }
+  .rank-2 .rank-badge { background: #e0f2fe; color: #0284c7; border-color: #bae6fd; }
+  .rank-3 .rank-badge { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+
+  /* =========================================
+     PDF Export Fixes (ปรับแก้การบันทึก PDF ไม่ให้บีบเละ)
+     ========================================= */
+  .pdf-export-mode body { background: #ffffff !important; }
+  .pdf-export-mode .main-container { max-width: 100% !important; padding: 0 !important; margin: 0 !important; box-shadow: none !important; }
+  .pdf-export-mode .glass-card, .pdf-export-mode .plan-card {
+    backdrop-filter: none !important;
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+  }
+  .pdf-export-mode .row { display: flex !important; flex-wrap: nowrap !important; flex-direction: row !important; }
+  .pdf-export-mode .col-lg-5 { width: 40% !important; flex: 0 0 40% !important; padding-right: 20px !important; }
+  .pdf-export-mode .col-lg-7 { width: 60% !important; flex: 0 0 60% !important; }
+  .pdf-export-mode .col-md-4 { width: 33.33% !important; flex: 0 0 33.33% !important; padding: 0 10px !important; }
+  .pdf-export-mode .plan-card { transform: none !important; margin-bottom: 20px !important; }
+  .pdf-export-mode .result-box { page-break-inside: avoid !important; break-inside: avoid !important; box-shadow: none !important; border: 1px solid #cbd5e1 !important; }
+  .pdf-export-mode .dom-banner { padding: 20px !important; }
+
+</style>
