@@ -1,4 +1,4 @@
-<img width="1918" height="860" alt="home-page" src="https://github.com/user-attachments/assets/3384d806-02f3-4e9d-a66a-684a161752d5" /># Multiple Intelligences Assessment System for Grade 9 Students
+# Multiple Intelligences Assessment System for Grade 9 Students
 ระบบแบบประเมินความถนัดทางพหุปัญญา สำหรับนักเรียนชั้นมัธยมศึกษาปีที่ 3
 
 ## About the Project
@@ -22,32 +22,23 @@
 2. ระบบส่งข้อมูลผ่าน Google Apps Script
 3. คำนวณคะแนนและบันทึกผลลงใน Google Sheets ทันที
 
-## 🖼 Screenshots
+## Screenshots
 
-* **หน้าแรก :**
-  `<img width="1918" height="860" alt="home-page" src="https://github.com/user-attachments/assets/89a73ce8-d5ff-4895-be65-21a216043ea3" />`
+![หน้าแรก](home-page.png)
 
-* **หน้าแบบประเมิน :**
-<img width="1896" height="862" alt="assessment-page" src="https://github.com/user-attachments/assets/391d8a88-a88f-4a37-a69d-9eb69d4787ae" />
+![หน้าทำแบบประเมิน](assessment-page.png)
 
+![หน้าแสดงผลการประเมิน](result-page.png)
 
-* **หน้าแสดงผลการประเมิน :**
-  ``
+![หน้าเข้าสู่ระบบหลังบ้าน](admin-page.png)
 
-* **หน้าเข้าสู่ระบบหลังบ้าน :**
+![หน้า Dashboard](dashboard-page.png)
 
+![หน้า Edit Questions](edit-questions-page.png)
 
-* **หน้า Dashboard :**
+![หน้า Edit Users](edit-users-page.png)
 
-
-* **หน้า Edit Users :**
-
-
-* **หน้า Edit Questions :**
-
-
-* **หน้า Edit Prompt :**
-
+![หน้า Edit Prompt](edit-prompt-page.png)
 
 
 ## ผู้จัดทำ
