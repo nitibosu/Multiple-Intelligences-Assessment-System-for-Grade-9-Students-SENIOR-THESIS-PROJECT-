@@ -15,7 +15,7 @@
 - **Frontend:** HTML, CSS, JavaScript, Bootstrap
 - **Backend / API:** Google Apps Script
 - **Database:** Google Sheets
-- **Analysis Method:** Confirmatory Factor Analysis (CFA) *หมายเหตุ: โปรเจกต์นี้ไม่ได้ใช้การประเมินค่า IOC*
+- **Analysis Method:** Confirmatory Factor Analysis (CFA)
 
 ## System Workflow
 1. ผู้ใช้ทำแบบประเมินผ่านหน้าเว็บ (Frontend)
